@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<title>Soil3 GPSアプリケーション</title>
+</head>
+<body>
+<div id="btnArea">
+	<button onclick="getLatLng();">現在位置を取得</button>
+</div>
+
+<section>
+	<h3>ログ</h3>
+	<div id="log">
+		<div id="dummy_child"></div>
+	</div>
+</section>
+</body>
+</html>
+
+<style>
+#btnArea{
+	width:100%;
+}
+#btnArea button{
+	margin:0 auto;
+	width:80%;
+	height:100px;
+}
+</style>
+
+<script>
+var last;	//最後に取得したタイムスタンプ 連打禁止のための設ける
+var logNode = document.querySelector("#log");
+
+(function(){
+	// if ('serviceWorker' in navigator) {
+    // 	navigator.serviceWorker.register('./service-worker.js'/*, {scope: './'} 明示的に指定することも可 */)
+    //          .then((registration) => {
+    //              console.log(`ServiceWorker registration successful with scope: ${registration.scope}`);
+    //          })
+    //          .catch(console.error.bind(console));
+	// }
+})();
+
+function getLatLng(){
+	//Geolocation APIを利用できない環境向けの処理
+	if (!navigator.geolocation) {
+		alert("GPSを取得出来る機能がありません");
+		return;
+	}
+
+	navigator.geolocation.getCurrentPosition(successFunc, errFunc);
+}
+
+function successFunc(pos){
+	if(last !== pos.timestamp){
+		var div = document.createElement('div');
+		div.innerHTML = createLog(pos.timestamp, pos.coords.latitude, pos.coords.longitude);
+
+		var childNodes = logNode.childNodes;
+		logNode.insertBefore(div, childNodes[0]);
+
+		//ログを表示出来る件数は10件 子ノードの数がなぜか4件から始まるので、11件になったところからdummyから消していく
+		if(childNodes[10]) logNode.removeChild(childNodes[10]);
+
+		last = pos.timestamp;
+	}
+}
+
+function errFunc(err){
+	alert("GPSの取得に失敗しました");
+}
+
+function createLog(timestamp, lat, lng){
+	var d = new Date(timestamp);
+	var str = d.getFullYear() + "-" +　(d.getMonth() + 1) + "-" + d.getDate() + " " + d.getHours() + ":" + d.getMinutes() + ":" + d.getSeconds() + "  ";
+	str += lat + "," + lng + "<br>";
+
+	//リンク集
+	if(navigator.connection.effectiveType){
+		//Google Maps
+		str += createHrefTag("https://www.google.co.jp/maps?q=" + lat + "," + lng + "", "地図") + "  ";
+
+		//土壌図
+		str += createHrefTag("https://soil-inventory.dc.affrc.go.jp/figure.php?lat=" + lat + "&lng=" + lng + "&zoom=15", "土質") + "  ";
+
+		//地質図
+		str += createHrefTag("https://gbank.gsj.jp/seamless/seamless2015/2d/?center=" + lat + "," + lng + "&z=12&marker=" + lat + "," + lng, "地質");
+	}
+
+	return str;
+}
+
+function createHrefTag(url, label){
+	return '<a href="' + url + '" target=\"_blank\">' + label + '</a>';
+}
+</script>
