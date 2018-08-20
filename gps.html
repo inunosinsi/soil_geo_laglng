@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width">
-<title>Soil3 GPSアプリケーション</title>
+<title>Soil And Geo Logger</title>
 </head>
 <body>
 <div id="btnArea">
@@ -33,6 +33,9 @@
 <script>
 var last;	//最後に取得したタイムスタンプ 連打禁止のための設ける
 var logNode = document.querySelector("#log");
+var dbName = "soil_and_geo";
+var storeName = "latlng";
+var recordLimit = 10;	//保持しておくログの件数
 
 (function(){
 	// if ('serviceWorker' in navigator) {
@@ -42,6 +45,9 @@ var logNode = document.querySelector("#log");
     //          })
     //          .catch(console.error.bind(console));
 	// }
+
+	//初回読み込み時にデータベースからログを取得する
+	getLog();
 })();
 
 function getLatLng(){
@@ -57,13 +63,16 @@ function getLatLng(){
 function successFunc(pos){
 	if(last !== pos.timestamp){
 		var div = document.createElement('div');
-		div.innerHTML = createLog(pos.timestamp, pos.coords.latitude, pos.coords.longitude);
+		div.innerHTML = buildLog(pos.timestamp, pos.coords.latitude, pos.coords.longitude);
 
 		var childNodes = logNode.childNodes;
 		logNode.insertBefore(div, childNodes[0]);
 
 		//ログを表示出来る件数は10件 子ノードの数がなぜか4件から始まるので、11件になったところからdummyから消していく
 		if(childNodes[10]) logNode.removeChild(childNodes[10]);
+
+		//ログを記録する
+		log(pos.timestamp, pos.coords.latitude, pos.coords.longitude);
 
 		last = pos.timestamp;
 	}
@@ -73,7 +82,7 @@ function errFunc(err){
 	alert("GPSの取得に失敗しました");
 }
 
-function createLog(timestamp, lat, lng){
+function buildLog(timestamp, lat, lng){
 	var d = new Date(timestamp);
 	var str = d.getFullYear() + "-" +　(d.getMonth() + 1) + "-" + d.getDate() + " " + d.getHours() + ":" + d.getMinutes() + ":" + d.getSeconds() + "  ";
 	str += lat + "," + lng + "<br>";
@@ -95,5 +104,85 @@ function createLog(timestamp, lat, lng){
 
 function createHrefTag(url, label){
 	return '<a href="' + url + '" target=\"_blank\">' + label + '</a>';
+}
+
+function log(timestamp, lat, lng){
+	var idxDb  = indexedDB.open(dbName);
+	idxDb.onupgradeneeded = function(event){
+    	var db = event.target.result;
+    	db.createObjectStore(storeName, {keyPath : 'timestamp'})
+	}
+
+	idxDb.onsuccess = function(event){
+  		console.log('db open success');
+		var data = {"timestamp":timestamp, "lat":lat, "lng":lng};
+		var db = event.target.result;
+    	var trans = db.transaction(storeName, 'readwrite');
+    	var store = trans.objectStore(storeName);
+    	var putReq = store.put(data);
+
+    	putReq.onsuccess = function(){
+			console.log('put data success');
+		}
+
+    	trans.oncomplete = function(){
+			// トランザクション完了時(putReq.onsuccessの後)に実行
+			console.log('transaction complete');
+		}
+		db.close();
+  	}
+  	idxDb.onerror = function(event){
+  		// 接続に失敗
+    	console.log('db open error');
+	}
+}
+
+function getLog(){
+	var idxDb  = indexedDB.open(dbName);
+	idxDb.onupgradeneeded = function(event){
+    	var db = event.target.result;
+    	db.createObjectStore(storeName, {keyPath : 'timestamp'})
+	}
+
+	idxDb.onsuccess = function(event){
+		var db = event.target.result;
+		var transaction = db.transaction(storeName, "readwrite");
+		var store = transaction.objectStore(storeName);
+		var request = store.openCursor();
+
+		var recordCnt = 0;	//集計する
+		var timestamps = [];
+		request.onsuccess = function (event) {
+			if(event.target.result == null) {
+				return;
+			}
+
+			var cursor = event.target.result;
+			var data = cursor.value;
+
+			var div = document.createElement('div');
+			div.innerHTML = buildLog(data.timestamp, data.lat, data.lng);
+
+			var childNodes = logNode.childNodes;
+			logNode.insertBefore(div, childNodes[0]);
+
+			//ログを表示出来る件数は10件 子ノードの数がなぜか4件から始まるので、11件になったところからdummyから消していく
+			if(childNodes[10]) logNode.removeChild(childNodes[10]);
+
+			timestamps.push(data.timestamp);
+
+			recordCnt++;
+			if(recordCnt > recordLimit){
+				//新しいデータを読み込む度に古いデータを一つ削除
+				var deleteReq = store.delete(timestamps[0]);
+				deleteReq.onsuccess = function (event) {
+					timestamps.shift();
+					console.log(timestamps[0]);
+				}
+			}
+
+			cursor.continue();
+		}
+	}
 }
 </script>
