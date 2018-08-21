@@ -7,7 +7,7 @@
 </head>
 <body>
 <div id="btnArea">
-	<button onclick="getLatLng();">現在位置を取得</button>
+	<button onclick="getLatLng();" id="gpsBtn">現在位置を取得</button>
 </div>
 
 <section>
@@ -31,23 +31,30 @@
 </style>
 
 <script>
-var last;	//最後に取得したタイムスタンプ 連打禁止のための設ける
 var logNode = document.querySelector("#log");
+var btnNode = document.querySelector("#gpsBtn");
+var timeout_id = null;
 var dbName = "soil_and_geo";
 var storeName = "latlng";
 var recordLimit = 10;	//保持しておくログの件数
 
 (function(){
-	// if ('serviceWorker' in navigator) {
-    // 	navigator.serviceWorker.register('./service-worker.js'/*, {scope: './'} 明示的に指定することも可 */)
-    //          .then((registration) => {
-    //              console.log(`ServiceWorker registration successful with scope: ${registration.scope}`);
-    //          })
-    //          .catch(console.error.bind(console));
-	// }
+	if ('serviceWorker' in navigator) {
+    	navigator.serviceWorker.register('./service-worker.js'/*, {scope: './'} 明示的に指定することも可 */)
+             .then((registration) => {
+                 console.log(`ServiceWorker registration successful with scope: ${registration.scope}`);
+             })
+             .catch(console.error.bind(console));
+	}
 
 	//初回読み込み時にデータベースからログを取得する
 	getLog();
+
+	//ネットワークに接続していなければ、緯度経度だけ取得しておく
+	// if(!navigator.connection.rtt){
+	// 	getLatLng();
+	// 	confirm("オフラインモードを実行して緯度経度を取得");
+	// }
 })();
 
 function getLatLng(){
@@ -57,25 +64,29 @@ function getLatLng(){
 		return;
 	}
 
+	//ボタンを10秒程止める
+	btnNode.disabled = "true";
+	timeout_id = setTimeout(function(){
+		btnNode.disabled = false;
+		clearTimeout(timeout_id);
+	}, 15000);
+
 	navigator.geolocation.getCurrentPosition(successFunc, errFunc);
 }
 
 function successFunc(pos){
-	if(last !== pos.timestamp){
-		var div = document.createElement('div');
-		div.innerHTML = buildLog(pos.timestamp, pos.coords.latitude, pos.coords.longitude);
+	var now = Date.now();
+	var div = document.createElement('div');
+	div.innerHTML = buildLog(now, pos.coords.latitude, pos.coords.longitude);
 
-		var childNodes = logNode.childNodes;
-		logNode.insertBefore(div, childNodes[0]);
+	var childNodes = logNode.childNodes;
+	logNode.insertBefore(div, childNodes[0]);
 
-		//ログを表示出来る件数は10件 子ノードの数がなぜか4件から始まるので、11件になったところからdummyから消していく
-		if(childNodes[10]) logNode.removeChild(childNodes[10]);
+	//ログを表示出来る件数は10件 子ノードの数がなぜか4件から始まるので、11件になったところからdummyから消していく
+	if(childNodes[recordLimit]) logNode.removeChild(childNodes[recordLimit]);
 
-		//ログを記録する
-		log(pos.timestamp, pos.coords.latitude, pos.coords.longitude);
-
-		last = pos.timestamp;
-	}
+	//ログを記録する
+	log(now, pos.coords.latitude, pos.coords.longitude);
 }
 
 function errFunc(err){
@@ -88,7 +99,7 @@ function buildLog(timestamp, lat, lng){
 	str += lat + "," + lng + "<br>";
 
 	//リンク集
-	if(navigator.connection.effectiveType){
+	if(navigator.connection.rtt){
 		//Google Maps
 		str += createHrefTag("https://www.google.co.jp/maps?q=" + lat + "," + lng + "", "地図") + "  ";
 
@@ -177,7 +188,6 @@ function getLog(){
 				var deleteReq = store.delete(timestamps[0]);
 				deleteReq.onsuccess = function (event) {
 					timestamps.shift();
-					console.log(timestamps[0]);
 				}
 			}
 
