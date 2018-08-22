@@ -49,12 +49,6 @@ var recordLimit = 10;	//保持しておくログの件数
 
 	//初回読み込み時にデータベースからログを取得する
 	getLog();
-
-	//ネットワークに接続していなければ、緯度経度だけ取得しておく
-	// if(!navigator.connection.rtt){
-	// 	getLatLng();
-	// 	confirm("オフラインモードを実行して緯度経度を取得");
-	// }
 })();
 
 function getLatLng(){
@@ -71,7 +65,13 @@ function getLatLng(){
 		clearTimeout(timeout_id);
 	}, 15000);
 
-	navigator.geolocation.getCurrentPosition(successFunc, errFunc);
+	var opts = {
+		"enableHighAccuracy": true ,
+		"timeout": 15000 ,
+		"maximumAge": 1 ,
+	} ;
+
+	navigator.geolocation.getCurrentPosition(successFunc, errFunc, opts);
 }
 
 function successFunc(pos){
@@ -99,7 +99,7 @@ function buildLog(timestamp, lat, lng){
 	str += lat + "," + lng + "<br>";
 
 	//リンク集
-	if(navigator.connection.rtt){
+	if(!navigator.connection || navigator.connection.rtt){
 		//Google Maps
 		str += createHrefTag("https://www.google.co.jp/maps?q=" + lat + "," + lng + "", "地図") + "  ";
 
