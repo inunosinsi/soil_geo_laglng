@@ -33,6 +33,7 @@
 <script>
 var logNode = document.querySelector("#log");
 var btnNode = document.querySelector("#gpsBtn");
+var lastLat, lastLng;
 var timeout_id = null;
 var dbName = "soil_and_geo";
 var storeName = "latlng";
@@ -63,11 +64,11 @@ function getLatLng(){
 	timeout_id = setTimeout(function(){
 		btnNode.disabled = false;
 		clearTimeout(timeout_id);
-	}, 15000);
+	}, 10000);
 
 	var opts = {
 		"enableHighAccuracy": true ,
-		"timeout": 15000 ,
+		"timeout": 10000 ,
 		"maximumAge": 1 ,
 	} ;
 
@@ -75,18 +76,22 @@ function getLatLng(){
 }
 
 function successFunc(pos){
-	var now = Date.now();
-	var div = document.createElement('div');
-	div.innerHTML = buildLog(now, pos.coords.latitude, pos.coords.longitude);
+	if(lastLat != pos.coords.latitude && lastLng != pos.coords.longitude){
+		lastLat = pos.coords.latitude;
+		lastLng = pos.coords.longitude;
+		var now = Date.now();
+		var div = document.createElement('div');
+		div.innerHTML = buildLog(now, lastLat, lastLng);
 
-	var childNodes = logNode.childNodes;
-	logNode.insertBefore(div, childNodes[0]);
+		var childNodes = logNode.childNodes;
+		logNode.insertBefore(div, childNodes[0]);
 
-	//ログを表示出来る件数は10件 子ノードの数がなぜか4件から始まるので、11件になったところからdummyから消していく
-	if(childNodes[recordLimit]) logNode.removeChild(childNodes[recordLimit]);
+		//ログを表示出来る件数は10件 子ノードの数がなぜか4件から始まるので、11件になったところからdummyから消していく
+		if(childNodes[recordLimit]) logNode.removeChild(childNodes[recordLimit]);
 
-	//ログを記録する
-	log(now, pos.coords.latitude, pos.coords.longitude);
+		//ログを記録する
+		log(now, lastLat, lastLng);
+	}
 }
 
 function errFunc(err){
@@ -171,8 +176,11 @@ function getLog(){
 			var cursor = event.target.result;
 			var data = cursor.value;
 
+			lastLat = data.lat;
+			lastLng = data.lng;
+
 			var div = document.createElement('div');
-			div.innerHTML = buildLog(data.timestamp, data.lat, data.lng);
+			div.innerHTML = buildLog(data.timestamp, lastLat, lastLng);
 
 			var childNodes = logNode.childNodes;
 			logNode.insertBefore(div, childNodes[0]);

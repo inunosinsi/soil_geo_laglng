@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cache-v2';
+const CACHE_NAME = 'saitodev_geo_v1';
 const urlsToCache = [
     './gps.html',
 ];
