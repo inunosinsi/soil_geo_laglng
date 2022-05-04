@@ -1,0 +1,102 @@
+
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width" />
+<link rel="stylesheet" href="//unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+  integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+  crossorigin=""/>
+<script src="//unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+  integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+  crossorigin=""></script>
+<style>
+      /* Always set the map height explicitly to define the size of the div
+       * element that contains the map. */
+      #map {
+		margin:0 auto;
+		width:90%;
+        height: 85%;
+      }
+      /* Optional: Makes the sample page fill the window. */
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+<title>Soil And Geo Logger</title>
+</head>
+<body>
+<div id="map"></div>
+</body>
+<script>
+// 仮 摂津峡　経度(lng)の方が数字が大きい
+var osm_default_lat = 34.877647854266584;
+var osm_default_lng = 135.58724326280114;
+
+var map;
+function create_osm_map(lat, lng){
+	map = L.map('map', {
+		center: [lat,lng],
+		zoom: 17,
+	});
+	var tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+		attribution: '© <a href="http://osm.org/copyright">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>',
+	});
+	tileLayer.addTo(map);
+
+	var clickMarker = null;
+	map.on('click', function(ele){
+		if (clickMarker) {
+			map.removeLayer(clickMarker);
+		}
+		var newLat = ele.latlng.lat;
+		var newLng = ele.latlng.lng;
+		
+		var marker = L.marker([newLat, newLng]);
+		marker.addTo(map);
+
+		var pop = L.popup();
+
+		var str = "";
+		str += createHrefTag("https://www.google.co.jp/maps?q=" + newLat + "," + newLng + "", "地図") + "  ";
+		str += createHrefTag("https://soil-inventory.rad.naro.go.jp/figure.html?lat=" + newLat + "&lng=" + newLng + "&zoom=15", "土質") + "  ";
+		str += createHrefTag("https://gbank.gsj.jp/seamless/seamless2015/2d/?center=" + newLat + "," + newLng + "&z=12&marker=" + lat + "," + newLng, "地質");
+
+		// 吹き出しに表示する文
+		pop.setContent(str);
+
+		// マーカーと吹き出しの関連付け
+		marker.bindPopup(pop);
+
+		// 吹き出しを開く
+		marker.openPopup();
+	});
+}
+
+function geo_api_success_callback(pos){
+	var lat = pos.coords.latitude;
+	var lng = pos.coords.longitude;
+	create_osm_map(lat, lng);
+}
+
+function geo_api_error_callback(err){
+	create_osm_map(osm_default_lat, osm_default_lng);
+}
+
+function createHrefTag(url, label){
+	return '<a href="' + url + '" target=\"_blank\">' + label + '</a>';
+}
+
+(function(){
+	// HTML5 geolocation API
+	if (location.search.indexOf("landmark=") < 0 && navigator.geolocation){
+		navigator.geolocation.getCurrentPosition(geo_api_success_callback, geo_api_error_callback);
+	}else{
+		create_osm_map(osm_default_lat, osm_default_lon);
+	}
+})();
+
+</script>
